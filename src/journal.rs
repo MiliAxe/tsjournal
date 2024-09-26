@@ -1,8 +1,9 @@
 use chrono::{self, Datelike};
+use std::path::PathBuf;
 use std::process::Command;
 
 pub struct JournalManager {
-    pub rootdir: String,
+    pub rootdir: PathBuf,
 }
 
 impl JournalManager {
@@ -26,8 +27,9 @@ impl JournalManager {
         )
     }
 
-    fn get_journal_dir(&self) -> String {
-        format!("{}/{}", self.rootdir, JournalManager::get_date_str())
+    fn get_journal_dir(&self) -> PathBuf {
+        // format!("{}/{}", self.rootdir, JournalManager::get_date_str())
+        self.rootdir.join(JournalManager::get_date_str())
     }
 
     pub fn create_dirs(&self) {
@@ -35,7 +37,7 @@ impl JournalManager {
     }
 
     pub fn new_journal(&self, title: &String) {
-        let journal_path = format!("{}/{}.tmp", self.get_journal_dir(), title);
+        let journal_path = self.get_journal_dir().join(format!("{title}.tmp"));
         let editor_status = Command::new("nvim").arg(&journal_path).status();
 
         match editor_status {
@@ -56,4 +58,6 @@ impl JournalManager {
             }
         }
     }
+
+
 }
