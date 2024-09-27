@@ -32,6 +32,59 @@ impl JournalManager {
             .expect("Failed to write encrypted journal");
     }
 
+    pub fn get_journal_content(&self) -> String {
+        let journal_path = self.get_journal_fzf_path();
+        JournalManager::decrypt_buffer(&journal_path)
+    }
+
+    fn decrypt_buffer(path: &PathBuf) -> String {
+        let mut password = String::new();
+
+        print!("Enter your journal password: ");
+        io::stdout().flush().expect("Failed to flush stdout");
+
+        std::io::stdin()
+            .read_line(&mut password)
+            .expect("Failed to read password from stdin");
+
+        let buffer = fs::read(path).expect("Failed to read journal");
+
+        let res = XORCryptor::new(&password).expect("Failed to create encryptor");
+
+        let decrypted_buffer = res.decrypt_vec(buffer);
+
+        String::from_utf8_lossy(&decrypted_buffer).to_string()
+    }
+
+    fn get_journal_fzf_path(&self) -> PathBuf {
+        let fd_child = Command::new("fd")
+            .args([
+                "-tf",
+                "-e",
+                "tsj",
+                ".",
+                &self.rootdir.clone().into_os_string().into_string().unwrap(),
+            ])
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to start fd process");
+
+        let fd_out = fd_child.stdout.expect("Failed to open fd stdout");
+
+        let fzf_child = Command::new("fzf")
+            .stdin(Stdio::from(fd_out))
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to start fzf process");
+
+        let output = fzf_child
+            .wait_with_output()
+            .expect("Failed to wait on sed")
+            .stdout;
+
+        PathBuf::from(String::from_utf8(output).unwrap().trim_end())
+    }
+
     fn now_jalalidate() -> jalali_date::JalaliDate {
         let time_now = chrono::offset::Local::now();
 

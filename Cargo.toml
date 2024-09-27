@@ -8,4 +8,6 @@ chrono = "0.4.38"
 clap = { version = "4.5.18", features = ["env", "derive"] }
 jalali-date = "=0.2.0"
 shellexpand = "3.1.0"
+tempfile = "3.12.0"
 time = "0.3.36"
+xor_cryptor = "1.2.3"
