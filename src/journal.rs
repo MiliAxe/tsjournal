@@ -1,12 +1,37 @@
 use chrono::{self, Datelike};
+use std::fs;
+use std::io;
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use xor_cryptor::XORCryptor;
 
 pub struct JournalManager {
     pub rootdir: PathBuf,
 }
 
 impl JournalManager {
+    fn write_encrypted_buffer(file_content: String, path: &PathBuf) {
+        let mut password = String::new();
+
+        print!("Enter your journal password: ");
+        io::stdout().flush().expect("Failed to flush stdout");
+
+        std::io::stdin()
+            .read_line(&mut password)
+            .expect("Failed to read password from stdin");
+
+        let buffer = file_content.as_bytes().to_vec();
+
+        let res = XORCryptor::new(&password).expect("Failed to create encryptor");
+
+        let encrypted_buffer = res.encrypt_vec(buffer);
+
+        let mut file = fs::File::create(path).expect("Failed to create journal file");
+        file.write_all(encrypted_buffer.as_ref())
+            .expect("Failed to write encrypted journal");
+    }
+
     fn now_jalalidate() -> jalali_date::JalaliDate {
         let time_now = chrono::offset::Local::now();
 
@@ -37,15 +62,19 @@ impl JournalManager {
     }
 
     pub fn new_journal(&self, title: &String) {
-        let journal_path = self.get_journal_dir().join(format!("{title}.tmp"));
-        let editor_status = Command::new("nvim").arg(&journal_path).status();
+        let journal_path = self.get_journal_dir().join(format!("{title}.tsj"));
+        let journal_temp_file =
+            tempfile::NamedTempFile::new().expect("Failed to create temp journal");
+        let journal_temp_path = journal_temp_file.path().to_owned();
+        let editor_status = Command::new("nvim").arg(&journal_temp_path).status();
 
         match editor_status {
             Ok(status) if status.success() => {
-                if std::fs::exists(&journal_path).expect("Can't check the existence of new journal")
+                if std::fs::exists(&journal_temp_path)
+                    .expect("Can't check the existence of new journal")
                 {
-                    let new_content = std::fs::read_to_string(&journal_path).unwrap();
-                    println!("New content: {}", new_content);
+                    let new_content = std::fs::read_to_string(&journal_temp_path).unwrap();
+                    JournalManager::write_encrypted_buffer(new_content, &journal_path);
                 } else {
                     eprintln!("No new journal to write!");
                 }
@@ -58,6 +87,4 @@ impl JournalManager {
             }
         }
     }
-
-
 }
