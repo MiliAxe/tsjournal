@@ -1,4 +1,5 @@
 use chrono::{self, Datelike};
+use std::env;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -49,26 +50,8 @@ impl JournalManager {
         let temp_unencrypted_journal = JournalManager::write_temp_file(journal_content);
         let temp_journal_path = temp_unencrypted_journal.path().to_owned();
 
-        let editor_status = Command::new("nvim").arg(&temp_journal_path).status();
-
-        match editor_status {
-            Ok(status) if status.success() => {
-                if std::fs::exists(temp_journal_path)
-                    .expect("Can't check the existence of new journal")
-                {
-                    let new_content = std::fs::read_to_string(&temp_unencrypted_journal).unwrap();
-                    JournalManager::write_encrypted_buffer(new_content, &journal_path);
-                } else {
-                    eprintln!("No new journal to write!");
-                }
-            }
-            Ok(status) => {
-                eprintln!("Neovim exited with: {}", status)
-            }
-            Err(e) => {
-                eprintln!("Failed to open neovim: {}", e);
-            }
-        }
+        let new_content = JournalManager::get_editor_content(temp_journal_path);
+        JournalManager::write_encrypted_buffer(new_content, &journal_path);
     }
 
     pub fn get_journal_content(&self) -> String {
@@ -149,34 +132,43 @@ impl JournalManager {
         self.rootdir.join(JournalManager::get_date_str())
     }
 
+    fn get_editor_content(path: PathBuf) -> String {
+        let editor = match env::var("EDITOR") {
+            Ok(val) => val,
+            Err(_) => "nvim".to_string(),
+        };
+
+        let editor_status = Command::new(editor).arg(&path).status();
+
+        match editor_status {
+            Ok(status) if status.success() => {
+                if std::fs::exists(&path).expect("Can't check the existence of new journal") {
+                    std::fs::read_to_string(&path).unwrap()
+                } else {
+                    panic!("No new journal to write!");
+                }
+            }
+            Ok(status) => {
+                panic!("Neovim exited with: {}", status)
+            }
+            Err(e) => {
+                panic!("Failed to open neovim: {}", e);
+            }
+        }
+    }
+
     pub fn create_dirs(&self) {
         std::fs::create_dir_all(self.get_journal_dir()).expect("Failed to create folders");
     }
 
     pub fn new_journal(&self, title: &String) {
-        let journal_path = self.get_journal_dir().join(format!("{title}.tsj"));
+        let journal_final_path = self.get_journal_dir().join(format!("{title}.tsj"));
+
         let journal_temp_file =
             tempfile::NamedTempFile::new().expect("Failed to create temp journal");
         let journal_temp_path = journal_temp_file.path().to_owned();
-        let editor_status = Command::new("nvim").arg(&journal_temp_path).status();
 
-        match editor_status {
-            Ok(status) if status.success() => {
-                if std::fs::exists(&journal_temp_path)
-                    .expect("Can't check the existence of new journal")
-                {
-                    let new_content = std::fs::read_to_string(&journal_temp_path).unwrap();
-                    JournalManager::write_encrypted_buffer(new_content, &journal_path);
-                } else {
-                    eprintln!("No new journal to write!");
-                }
-            }
-            Ok(status) => {
-                eprintln!("Neovim exited with: {}", status)
-            }
-            Err(e) => {
-                eprintln!("Failed to open neovim: {}", e);
-            }
-        }
+        let new_content = JournalManager::get_editor_content(journal_temp_path);
+        JournalManager::write_encrypted_buffer(new_content, &journal_final_path);
     }
 }
