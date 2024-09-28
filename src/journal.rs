@@ -4,6 +4,7 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use tempfile::NamedTempFile;
 use xor_cryptor::XORCryptor;
 
 pub struct JournalManager {
@@ -30,6 +31,44 @@ impl JournalManager {
         let mut file = fs::File::create(path).expect("Failed to create journal file");
         file.write_all(encrypted_buffer.as_ref())
             .expect("Failed to write encrypted journal");
+    }
+
+    fn write_temp_file(file_content: String) -> NamedTempFile {
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file.");
+
+        temp_file
+            .write_all(file_content.as_bytes())
+            .expect("Failed to write to temp file");
+
+        temp_file
+    }
+
+    pub fn edit_journal(&self) {
+        let journal_path = self.get_journal_fzf_path();
+        let journal_content = JournalManager::decrypt_buffer(&journal_path);
+        let temp_unencrypted_journal = JournalManager::write_temp_file(journal_content);
+        let temp_journal_path = temp_unencrypted_journal.path().to_owned();
+
+        let editor_status = Command::new("nvim").arg(&temp_journal_path).status();
+
+        match editor_status {
+            Ok(status) if status.success() => {
+                if std::fs::exists(temp_journal_path)
+                    .expect("Can't check the existence of new journal")
+                {
+                    let new_content = std::fs::read_to_string(&temp_unencrypted_journal).unwrap();
+                    JournalManager::write_encrypted_buffer(new_content, &journal_path);
+                } else {
+                    eprintln!("No new journal to write!");
+                }
+            }
+            Ok(status) => {
+                eprintln!("Neovim exited with: {}", status)
+            }
+            Err(e) => {
+                eprintln!("Failed to open neovim: {}", e);
+            }
+        }
     }
 
     pub fn get_journal_content(&self) -> String {

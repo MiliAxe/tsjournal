@@ -26,13 +26,10 @@ fn main() {
         }
 
         args::Commands::Print {} => {
-            // let journal_path =
-            //     PathBuf::from("/home/mili/Documents/tsjournals/1403/7/6/midnight.tsj");
-            // print!("{}", JournalManager::decrypt_buffer(&journal_path));
             print!("{}", jmanager.get_journal_content())
         }
         args::Commands::Edit {} => {
-            dbg!("Edit journals...");
+            jmanager.edit_journal();
         }
     }
 }
