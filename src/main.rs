@@ -31,5 +31,9 @@ fn main() {
         args::Commands::Edit {} => {
             jmanager.edit_journal();
         }
+
+        args::Commands::List {} => {
+            jmanager.list_journals();
+        }
     }
 }

@@ -3,6 +3,7 @@ use std::env;
 use std::fs;
 use std::io;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tempfile::NamedTempFile;
@@ -79,7 +80,7 @@ impl JournalManager {
     }
 
     fn get_journal_fzf_path(&self) -> PathBuf {
-        let fd_child = Command::new("fd")
+        let mut fd_child = Command::new("fd")
             .args([
                 "-tf",
                 "-e",
@@ -90,6 +91,8 @@ impl JournalManager {
             .stdout(Stdio::piped())
             .spawn()
             .expect("Failed to start fd process");
+
+        fd_child.wait().expect("Failed to wait on fd");
 
         let fd_out = fd_child.stdout.expect("Failed to open fd stdout");
 
@@ -170,5 +173,49 @@ impl JournalManager {
 
         let new_content = JournalManager::get_editor_content(journal_temp_path);
         JournalManager::write_encrypted_buffer(new_content, &journal_final_path);
+    }
+
+    fn recurse_dir_and_print_util(dir: &Path, depth: usize) {
+        let print_tabs = String::from("  ").repeat(depth);
+        println!(
+            "{}{}",
+            print_tabs,
+            dir.file_stem().unwrap().to_str().unwrap()
+        );
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        Self::recurse_dir_and_print_util(entry.path().as_ref(), depth + 1);
+                    } else if file_type.is_file() {
+                        println!(
+                            "{}  {}",
+                            print_tabs,
+                            entry.file_name().into_string().unwrap()
+                        );
+                    }
+                } else {
+                    println!("couldn't get filetype");
+                }
+            }
+        }
+    }
+
+    fn recurse_dir_and_print(dir: &Path) {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                if let Ok(file_type) = entry.file_type() {
+                    if file_type.is_dir() {
+                        Self::recurse_dir_and_print_util(entry.path().as_ref(), 0);
+                    } else {
+                        println!("couldn't get filetype");
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn list_journals(&self) {
+        Self::recurse_dir_and_print(&self.rootdir);
     }
 }

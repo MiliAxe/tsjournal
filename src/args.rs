@@ -27,6 +27,9 @@ pub enum Commands {
 
     /// Print the content of an existing journal
     Print {},
+
+    /// List all the journals
+    List {},
 }
 
 impl Cli {
