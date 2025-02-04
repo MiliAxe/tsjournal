@@ -1,4 +1,5 @@
 use chrono::{self, Datelike};
+use colour::println_bold;
 use std::env;
 use std::fs;
 use std::io;
@@ -176,8 +177,8 @@ impl JournalManager {
     }
 
     fn recurse_dir_and_print_util(dir: &Path, depth: usize) {
-        let print_tabs = String::from("  ").repeat(depth);
-        println!(
+        let print_tabs = String::from("    ").repeat(depth);
+        println_bold!(
             "{}{}",
             print_tabs,
             dir.file_stem().unwrap().to_str().unwrap()
